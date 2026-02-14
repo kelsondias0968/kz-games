@@ -14,6 +14,7 @@ const GameList: React.FC<GameListProps> = ({ onSelectGame }) => {
                     <div className="relative h-56 overflow-hidden">
                         <img
                             alt={game.name}
+                            loading="lazy"
                             className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700"
                             src={game.image}
                         />

@@ -1,19 +1,30 @@
-
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { View, Game } from './types';
 import Layout from './components/Layout';
-import Home from './pages/Home';
-import GameDetail from './pages/GameDetail';
-import Profile from './pages/Profile';
-import Bets from './pages/Bets';
-import Auth from './pages/Auth';
-import Admin from './pages/Admin';
-import VerificationGuide from './pages/VerificationGuide';
-import DepositModal from './components/DepositModal';
-import WithdrawalModal from './components/WithdrawalModal';
-import GameList from './components/GameList';
 import { supabase } from './lib/supabase';
 import { useDepositPolling } from './lib/useDepositPolling';
+
+// Lazy load pages for performance
+const Home = lazy(() => import('./pages/Home'));
+const GameDetail = lazy(() => import('./pages/GameDetail'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Bets = lazy(() => import('./pages/Bets'));
+const Auth = lazy(() => import('./pages/Auth'));
+const Admin = lazy(() => import('./pages/Admin'));
+const VerificationGuide = lazy(() => import('./pages/VerificationGuide'));
+
+// Lazy load modals and heavy components
+const DepositModal = lazy(() => import('./components/DepositModal'));
+const WithdrawalModal = lazy(() => import('./components/WithdrawalModal'));
+const GameList = lazy(() => import('./components/GameList'));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 animate-in fade-in duration-500">
+    <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+    <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Carregando...</span>
+  </div>
+);
 
 // Helper to safely parse balance
 const parseBalance = (val: any): number => {
@@ -206,113 +217,117 @@ const App: React.FC = () => {
           isMuted={isMuted}
           onToggleMute={toggleMute}
         >
-          {activeView === 'home' && (
-            <Home onSelectGame={handleSelectGame} />
-          )}
+          <Suspense fallback={<PageLoader />}>
+            {activeView === 'home' && (
+              <Home onSelectGame={handleSelectGame} />
+            )}
 
-          {activeView === 'games' && (
-            <div className="space-y-6 pt-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="text-center space-y-2 mb-6">
-                <span className="material-icons-round text-primary text-4xl animate-bounce">casino</span>
-                <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter">Sala de Jogos</h2>
-                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Escolha sua raspadinha e comece agora</p>
-              </div>
-              <GameList onSelectGame={handleSelectGame} />
-            </div>
-          )}
-
-          {activeView === 'auth' && (
-            <Auth onAuthSuccess={() => setActiveView('home')} />
-          )}
-
-          {activeView === 'game' && selectedGame && (
-            userId ? (
-              <GameDetail
-                game={selectedGame}
-                balance={balance}
-                userId={userId}
-                onBack={() => handleNavigate('home')}
-                onPlay={handlePlay}
-                onWin={handleWin}
-                isMuted={isMuted}
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
-                <span className="material-icons-round text-6xl text-slate-700">person_add</span>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-black uppercase text-white">Crie sua Conta</h3>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Cadastre-se agora para começar a ganhar prêmios reais!</p>
+            {activeView === 'games' && (
+              <div className="space-y-6 pt-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="text-center space-y-2 mb-6">
+                  <span className="material-icons-round text-primary text-4xl animate-bounce">casino</span>
+                  <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter">Sala de Jogos</h2>
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Escolha sua raspadinha e comece agora</p>
                 </div>
-                <button
-                  onClick={() => setActiveView('auth')}
-                  className="bg-primary text-white px-8 py-4 rounded-2xl font-black uppercase text-xs shadow-lg shadow-primary/20 transition-all active:scale-95"
-                >
-                  Criar Conta Agora
-                </button>
+                <GameList onSelectGame={handleSelectGame} />
               </div>
-            )
-          )}
+            )}
 
-          {activeView === 'bets' && (
-            userId ? (
-              <Bets userId={userId} />
-            ) : (
-              <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
-                <span className="material-icons-round text-6xl text-slate-700">history</span>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Crie sua conta para ver seu histórico</p>
-                <button onClick={() => setActiveView('auth')} className="bg-primary text-white px-8 py-4 rounded-2xl font-black uppercase text-xs transition-all active:scale-95">Criar Conta</button>
-              </div>
-            )
-          )}
+            {activeView === 'auth' && (
+              <Auth onAuthSuccess={() => setActiveView('home')} />
+            )}
 
-          {activeView === 'profile' && (
-            userId ? (
-              <Profile
-                balance={balance}
-                bankIban={bankIban}
-                bankExpress={bankExpress}
-                onOpenWithdraw={() => setIsWithdrawModalOpen(true)}
-                onUpdateBankDetails={async (iban, express) => {
-                  if (!userId) return;
-                  const updates: any = {};
-                  if (iban) updates.bank_iban = iban;
-                  if (express) updates.bank_express = express;
+            {activeView === 'game' && selectedGame && (
+              userId ? (
+                <GameDetail
+                  game={selectedGame}
+                  balance={balance}
+                  userId={userId}
+                  onBack={() => handleNavigate('home')}
+                  onPlay={handlePlay}
+                  onWin={handleWin}
+                  isMuted={isMuted}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
+                  <span className="material-icons-round text-6xl text-slate-700">person_add</span>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-black uppercase text-white">Crie sua Conta</h3>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Cadastre-se agora para começar a ganhar prêmios reais!</p>
+                  </div>
+                  <button
+                    onClick={() => setActiveView('auth')}
+                    className="bg-primary text-white px-8 py-4 rounded-2xl font-black uppercase text-xs shadow-lg shadow-primary/20 transition-all active:scale-95"
+                  >
+                    Criar Conta Agora
+                  </button>
+                </div>
+              )
+            )}
 
-                  const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
-                  if (!error) {
-                    if (iban) setBankIban(iban);
-                    if (express) setBankExpress(express);
-                    alert('Dados bancários salvos com sucesso!');
-                  }
-                }}
-              />
-            ) : (
-              <Auth onAuthSuccess={() => setActiveView('profile')} />
-            )
-          )}
+            {activeView === 'bets' && (
+              userId ? (
+                <Bets userId={userId} />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
+                  <span className="material-icons-round text-6xl text-slate-700">history</span>
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Crie sua conta para ver seu histórico</p>
+                  <button onClick={() => setActiveView('auth')} className="bg-primary text-white px-8 py-4 rounded-2xl font-black uppercase text-xs transition-all active:scale-95">Criar Conta</button>
+                </div>
+              )
+            )}
 
-          {activeView === 'verify' && (
-            <VerificationGuide onBack={() => handleNavigate('home')} />
-          )}
+            {activeView === 'profile' && (
+              userId ? (
+                <Profile
+                  balance={balance}
+                  bankIban={bankIban}
+                  bankExpress={bankExpress}
+                  onOpenWithdraw={() => setIsWithdrawModalOpen(true)}
+                  onUpdateBankDetails={async (iban, express) => {
+                    if (!userId) return;
+                    const updates: any = {};
+                    if (iban) updates.bank_iban = iban;
+                    if (express) updates.bank_express = express;
+
+                    const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+                    if (!error) {
+                      if (iban) setBankIban(iban);
+                      if (express) setBankExpress(express);
+                      alert('Dados bancários salvos com sucesso!');
+                    }
+                  }}
+                />
+              ) : (
+                <Auth onAuthSuccess={() => setActiveView('profile')} />
+              )
+            )}
+
+            {activeView === 'verify' && (
+              <VerificationGuide onBack={() => handleNavigate('home')} />
+            )}
+          </Suspense>
         </Layout>
       )}
 
-      <DepositModal
-        isOpen={isDepositModalOpen}
-        onClose={() => setIsDepositModalOpen(false)}
-        onDeposit={handleDeposit}
-      />
+      <Suspense fallback={null}>
+        <DepositModal
+          isOpen={isDepositModalOpen}
+          onClose={() => setIsDepositModalOpen(false)}
+          onDeposit={handleDeposit}
+        />
 
-      <WithdrawalModal
-        isOpen={isWithdrawModalOpen}
-        onClose={() => setIsWithdrawModalOpen(false)}
-        balance={balance}
-        onWithdraw={handleWithdraw}
-        onVerify={() => setActiveView('verify')}
-        isVerified={isVerified}
-        bankIban={bankIban}
-        bankExpress={bankExpress}
-      />
+        <WithdrawalModal
+          isOpen={isWithdrawModalOpen}
+          onClose={() => setIsWithdrawModalOpen(false)}
+          balance={balance}
+          onWithdraw={handleWithdraw}
+          onVerify={() => setActiveView('verify')}
+          isVerified={isVerified}
+          bankIban={bankIban}
+          bankExpress={bankExpress}
+        />
+      </Suspense>
     </div>
   );
 };

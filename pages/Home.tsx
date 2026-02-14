@@ -59,6 +59,7 @@ const Home: React.FC<HomeProps> = ({ onSelectGame }) => {
             <img
               src={src}
               alt={`Banner ${index + 1}`}
+              loading={index === 0 ? 'eager' : 'lazy'}
               className="w-full h-full object-contain bg-gradient-to-br from-slate-900 to-slate-800"
             />
             {/* Overlay sutil para manter o estilo premium */}
@@ -97,6 +98,7 @@ const Home: React.FC<HomeProps> = ({ onSelectGame }) => {
             <div className="relative h-56 overflow-hidden">
               <img
                 alt={game.name}
+                loading="lazy"
                 className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700"
                 src={game.image}
               />
