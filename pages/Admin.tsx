@@ -242,18 +242,7 @@ const Admin: React.FC = () => {
 
         setLoading(true);
         try {
-            // 1. Get current balance
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('balance')
-                .eq('id', deposit.user_id)
-                .single();
-
-            if (profileError) throw profileError;
-
-            const newBalance = Number(profile.balance) + Number(deposit.amount);
-
-            // 2. Update status and balance (This should normally be in a transaction/RPC)
+            // 1. Update status
             const { error: updateDepositError } = await supabase
                 .from('deposits')
                 .update({ status: 'PAID', paid_at: new Date().toISOString() })
@@ -261,17 +250,45 @@ const Admin: React.FC = () => {
 
             if (updateDepositError) throw updateDepositError;
 
-            const { error: updateBalanceError } = await supabase
-                .from('profiles')
-                .update({ balance: newBalance })
-                .eq('id', deposit.user_id);
+            // 2. Update balance via robust RPC
+            const { data: newBalance, error: rpcError } = await supabase.rpc('increment_balance', {
+                _user_id: deposit.user_id,
+                _amount: Number(deposit.amount)
+            });
 
-            if (updateBalanceError) throw updateBalanceError;
+            if (rpcError) throw rpcError;
 
             alert('Depósito aprovado e saldo creditado com sucesso!');
             fetchData();
         } catch (err: any) {
             alert('Erro ao aprovar depósito: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleManualBalance = async (userId: string, currentBalance: number) => {
+        const amountStr = prompt(`Ajustar saldo (atual: ${currentBalance} Kz).\nInsira valor positivo para adicionar ou negativo para remover:`);
+        if (!amountStr) return;
+
+        const amount = parseFloat(amountStr);
+        if (isNaN(amount) || amount === 0) {
+            alert('Valor inválido.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { data, error } = await supabase.rpc('increment_balance', {
+                _user_id: userId,
+                _amount: amount
+            });
+
+            if (error) throw error;
+            alert(`Saldo atualizado! Novo saldo: ${data} Kz`);
+            fetchData();
+        } catch (err: any) {
+            alert('Erro ao atualizar saldo: ' + err.message);
         } finally {
             setLoading(false);
         }
@@ -638,13 +655,22 @@ const Admin: React.FC = () => {
                                                                 {new Date(user.created_at).toLocaleDateString('pt-AO')}
                                                             </td>
                                                             <td className="px-8 py-5 text-right">
-                                                                <button
-                                                                    onClick={() => handleDeleteUser(user.id)}
-                                                                    className="p-2 text-slate-600 hover:text-red-500 transition-colors"
-                                                                    title="Remover Usuário"
-                                                                >
-                                                                    <span className="material-icons-round text-lg">delete_forever</span>
-                                                                </button>
+                                                                <div className="flex justify-end gap-2">
+                                                                    <button
+                                                                        onClick={() => handleManualBalance(user.id, user.balance)}
+                                                                        className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                                                        title="Ajustar Saldo"
+                                                                    >
+                                                                        <span className="material-icons-round text-lg">add_card</span>
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteUser(user.id)}
+                                                                        className="p-2 text-slate-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                                        title="Remover Usuário"
+                                                                    >
+                                                                        <span className="material-icons-round text-lg">delete_forever</span>
+                                                                    </button>
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     ))}

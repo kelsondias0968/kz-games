@@ -53,23 +53,25 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess, title, subtitle, disableRegi
                     throw signUpError;
                 }
 
-                // Profile creation is important but shouldn't freeze the whole UI if it slows down
+                // Profile creation
                 if (signUpData.user) {
                     const userId = signUpData.user.id;
-                    const startTime = Date.now();
-
                     try {
+                        // Use upsert but don't force balance to 0 if it already exists (e.g. from a previous failed attempt)
+                        // The database default for balance is already 0.00
                         const { error: profileError } = await supabase
                             .from('profiles')
                             .upsert({
                                 id: userId,
                                 name: name,
                                 email: email,
-                                balance: 0,
                             }, { onConflict: 'id' });
 
-                        if (profileError) console.error('Non-critical profile creation error:', profileError);
-                        console.log(`Profile synced in ${Date.now() - startTime}ms`);
+                        if (profileError) {
+                            console.error('Profile creation error:', profileError);
+                        } else {
+                            console.log('Profile created/synced successfully');
+                        }
                     } catch (e) {
                         console.error('Async profile creation failed:', e);
                     }

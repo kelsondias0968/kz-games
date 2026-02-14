@@ -156,8 +156,8 @@ const App: React.FC = () => {
             filter: `id=eq.${userId}`,
           },
           (payload: any) => {
-            if (payload.new && typeof payload.new.balance === 'number') {
-              setBalance(payload.new.balance);
+            if (payload.new && payload.new.balance !== undefined) {
+              setBalance(Number(payload.new.balance));
             }
           }
         )
