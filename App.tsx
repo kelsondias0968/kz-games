@@ -90,20 +90,15 @@ const App: React.FC = () => {
     if (!userId) return;
 
     // Use RPC for atomic operations (prevents balance drift)
+    // Note: Direct updates are blocked by the 'trg_protect_balance' trigger for security.
     const { data: newBalance, error } = await supabase.rpc('increment_balance', {
       _user_id: userId,
       _amount: amount
     });
 
     if (error) {
-      console.warn('RPC failed, trying direct update:', error.message);
-      // Simple direct update fallback
-      const { data: current } = await supabase.from('profiles').select('balance').eq('id', userId).single();
-      const nextVal = (Number(current?.balance || 0) + amount);
-      if (nextVal < 0) throw new Error("Saldo insuficiente");
-
-      const { data: updated } = await supabase.from('profiles').update({ balance: nextVal }).eq('id', userId).select('balance').single();
-      if (updated) setBalance(Number(updated.balance));
+      console.error('❌ Balance sync failed:', error.message);
+      throw new Error(error.message || "Erro ao sincronizar saldo");
     } else if (newBalance !== null) {
       setBalance(Number(newBalance));
     }
