@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico de Depósitos - Kz Games</title>
+    <style>
+        :root {
+            --primary: #0066ff;
+            --bg: #0a0a0c;
+            --card: #16161a;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 25px;
+            border-radius: 12px;
+            max-width: 800px;
+            margin: 0 auto 20px;
+            border: 1px solid #333;
+        }
+
+        h2 {
+            color: var(--primary);
+            margin-top: 0;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        button:disabled {
+            background: #444;
+            opacity: 0.7;
+        }
+
+        pre {
+            background: #000;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+            max-height: 300px;
+            border: 1px solid #222;
+        }
+
+        .success {
+            color: #00ff88;
+        }
+
+        .error {
+            color: #ff4444;
+        }
+
+        .log-entry {
+            font-family: monospace;
+            border-bottom: 1px solid #222;
+            padding: 8px 0;
+            font-size: 12px;
+        }
+
+        .log-INFO {
+            color: #aaa;
+        }
+
+        .log-DEBUG {
+            color: #00ccff;
+        }
+
+        .log-SUCCESS {
+            color: #00ff88;
+            font-weight: bold;
+        }
+
+        .log-ERROR {
+            color: #ff4444;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="card">
+        <h2>🛠️ Ferramenta de Verificação</h2>
+        <p>Use esta página para forçar a verificação de depósitos e ver o que está acontecendo "por baixo do capô".</p>
+
+        <div style="margin-bottom: 20px;">
+            <button id="btnVerify">🚀 Verificar Depósitos Agora</button>
+            <button id="btnLogs" style="background: #333;">📊 Ver Logs do Sistema</button>
+        </div>
+
+        <div id="status">Aguardando ação...</div>
+    </div>
+
+    <div class="card">
+        <h2>📦 Resultados da Verificação</h2>
+        <pre id="output">Os resultados aparecerão aqui...</pre>
+    </div>
+
+    <div class="card">
+        <h2>📜 Logs Recentes (Banco de Dados)</h2>
+        <div id="logsList">Carregue os logs para visualizar...</div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.7.1/+esm';
+
+        // Constantes do Projeto
+        const SUPABASE_URL = 'https://nlsswhijouudftnnyxpw.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_eKk-CqPy5s_e3GZ4CQhvnw_ZJGp3Bhe';
+
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const btnVerify = document.getElementById('btnVerify');
+        const btnLogs = document.getElementById('btnLogs');
+        const output = document.getElementById('output');
+        const status = document.getElementById('status');
+        const logsList = document.getElementById('logsList');
+
+        async function verify() {
+            btnVerify.disabled = true;
+            status.innerHTML = '⏳ Chamando Edge Function...';
+            output.innerHTML = 'Processando...';
+
+            try {
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/check-pending-deposits`, {
+                    method: 'GET', // Usando GET para facilitar teste
+                    headers: { 'apikey': SUPABASE_KEY }
+                });
+
+                const data = await response.json();
+                output.innerHTML = JSON.stringify(data, null, 2);
+
+                if (data.processed > 0) {
+                    status.innerHTML = `<span class="success">✅ ${data.processed} depósitos processados!</span>`;
+                } else {
+                    status.innerHTML = 'ℹ️ Nenhum depósito pago encontrado.';
+                }
+            } catch (err) {
+                status.innerHTML = `<span class="error">❌ Erro: ${err.message}</span>`;
+                output.innerHTML = err.stack;
+            } finally {
+                btnVerify.disabled = false;
+                loadLogs();
+            }
+        }
+
+        async function loadLogs() {
+            logsList.innerHTML = 'Carregando logs...';
+            try {
+                const { data, error } = await supabase
+                    .from('system_logs')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(15);
+
+                if (error) throw error;
+
+                if (data.length === 0) {
+                    logsList.innerHTML = 'Nenhum log encontrado no banco.';
+                    return;
+                }
+
+                logsList.innerHTML = data.map(log => `
+                    <div class="log-entry">
+                        <span style="color: #666">[${new Date(log.created_at).toLocaleTimeString()}]</span>
+                        <span class="log-${log.level}">${log.level}</span>: 
+                        ${log.message}
+                        <div style="font-size: 10px; color: #888; margin-left: 20px;">
+                            ${JSON.stringify(log.details)}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                logsList.innerHTML = `<span class="error">Erro ao carregar logs: ${err.message}</span>`;
+            }
+        }
+
+        btnVerify.addEventListener('click', verify);
+        btnLogs.addEventListener('click', loadLogs);
+
+        // Carregar logs ao iniciar
+        loadLogs();
+    </script>
+</body>
+
+</html>
