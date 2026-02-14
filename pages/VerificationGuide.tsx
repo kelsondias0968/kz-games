@@ -10,29 +10,40 @@ const VerificationGuide: React.FC<VerificationGuideProps> = ({ onBack }) => {
     const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
 
     useEffect(() => {
-        const fetchUrl = async () => {
+        const fetchSettings = async () => {
             try {
-                const { data } = await supabase
+                // Fetch URL
+                const { data: urlData } = await supabase
                     .from('site_settings')
                     .select('value')
                     .eq('key', 'verification_redirect_url')
                     .single();
 
-                if (data?.value) {
-                    setRedirectUrl(data.value);
-                    // Proactive redirect after 1.5s
+                // Fetch Delay
+                const { data: delayData } = await supabase
+                    .from('site_settings')
+                    .select('value')
+                    .eq('key', 'verification_button_delay')
+                    .single();
+
+                const url = urlData?.value;
+                const delay = (delayData?.value || 1.5) * 1000; // Convert to ms
+
+                if (url) {
+                    setRedirectUrl(url);
+                    // Proactive redirect after the configured delay
                     setTimeout(() => {
-                        window.location.href = data.value;
-                    }, 1500);
+                        window.location.href = url;
+                    }, delay);
                 }
             } catch (err) {
-                console.error('Error fetching redirect URL:', err);
+                console.error('Error fetching verification settings:', err);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchUrl();
+        fetchSettings();
     }, []);
 
     const handleRedirect = () => {
